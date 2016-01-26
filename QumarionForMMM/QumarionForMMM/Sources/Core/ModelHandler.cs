@@ -88,33 +88,85 @@ namespace QumarionForMMM
 
                 if (src == null || dest == null) continue;
 
-                //Qumarion側の正規化回転をMMDモデルのローカル回転に直す
-                var rotation = GetRotation(src.Rotation, mmdBone);
+                if(_armRollPair.Keys.Contains(mmdBone))
+                {
+                    var rollBone = MMDStandardBones.GetBone(model, _armRollPair[mmdBone]);
 
-                //初期回転との合成として取得: 
-                var motion = dest.CurrentLocalMotion;
-                //motion.Rotation = _modelInitialInfo[target].InitialRotation * rotation;
-                motion.Rotation = rotation;
-                dest.CurrentLocalMotion = motion;
+                    //追加ロジック: 回転をもとのボーンと「捩」ボーンに分割する
+                    Quaternion roll, nonRoll;
+                    QuaternionDecomposition.DecompositeStandardEuler(src.Rotation, out roll, out nonRoll);
+
+                    nonRoll = GetRotation(nonRoll, mmdBone);
+                    roll = GetRotation(roll, mmdBone);
+
+                    //本体側
+                    var motion = dest.CurrentLocalMotion;
+                    motion.Rotation = nonRoll;
+                    dest.CurrentLocalMotion = motion;
+
+                    //追加: 対応する「捩」ボーン
+                    var rollMotion = rollBone.CurrentLocalMotion;
+                    rollMotion.Rotation = roll;
+                    rollBone.CurrentLocalMotion = rollMotion;
+
+                }
+                else
+                {
+                    //普通のボーン
+
+                    //Qumarion側の正規化回転をMMDモデルのローカル回転に直す
+                    var rotation = GetRotation(src.Rotation, mmdBone);
+
+                    var motion = dest.CurrentLocalMotion;
+                    motion.Rotation = rotation;
+                    dest.CurrentLocalMotion = motion;
+                }
 
             }
         }
 
         private void ApplyIK(Model model)
         {
+            //追加: 加速度センサONの場合に回転不変性取るよう改善
+            var boneHip = QumarionModel.Bones[StandardPSBones.Hips];
+            var initPosHip = boneHip.InitialWorldMatrix.Translate;
+            var posHip = boneHip.WorldMatrix.Translate;
+            //NOTE: 
+            var rotHipInverse = MatrixRotationDif.CreateDifFrom(
+                boneHip.WorldMatrix.Rotate,
+                boneHip.InitialWorldMatrix.Rotate
+                ).Transpose();
+
+
             foreach (var t in _targetIKBones)
             {
                 var src = QumarionModel.Bones[QumaBone2MMDBone.GetQumaBone(t)];
                 var dest = MMDStandardBones.GetBone(model, t);
                 if (dest == null) continue;
 
-                var initpos = src.InitialWorldMatrix.Translate;
-                var currentpos = src.WorldMatrix.Translate;
+                //1: Tポーズでの Hip -> t のベクトル取得(これは直立)
+                var initPosWorld = src.InitialWorldMatrix.Translate;
+                var initPos = new Vector3f(
+                    initPosWorld.X - initPosHip.X,
+                    initPosWorld.Y - initPosHip.Y,
+                    initPosWorld.Z - initPosHip.Z
+                    );
+                //2: 現在の Hip -> t のベクトルを回転除去しつつ取得
+
+                var posWorld = src.WorldMatrix.Translate;
+                var pos = new Vector3f(
+                    posWorld.X - posHip.X,
+                    posWorld.Y - posHip.Y,
+                    posWorld.Z - posHip.Z
+                    );
+                //ここ大事: posのベクトルは体の回転込みの値なので逆回転して相殺
+                pos = MatrixUtil.Multiply(rotHipInverse, pos);
+
                 //NOTE: MMMではZ軸が後ろ向き正だがQumarionだと前向き正
                 var dif = new Vector3(
-                    currentpos.X - initpos.X,
-                    currentpos.Y - initpos.Y,
-                    -currentpos.Z + initpos.Z
+                    pos.X - initPos.X,
+                    pos.Y - initPos.Y,
+                    -pos.Z + initPos.Z
                     );
 
                 var motion = dest.CurrentLocalMotion;
@@ -126,19 +178,53 @@ namespace QumarionForMMM
         //モデルを接地させる(接地の定義は実装を見よ。)
         private void BoundCenterToGround(Model model)
         {
+            //追加: 加速度センサONの場合に回転不変性取るよう改善
+            var boneHip = QumarionModel.Bones[StandardPSBones.Hips];
+            var initPosHip = boneHip.InitialWorldMatrix.Translate;
+            var posHip = boneHip.WorldMatrix.Translate;
+            //NOTE: 
+            var rotHipInverse = MatrixRotationDif.CreateDifFrom(
+                boneHip.WorldMatrix.Rotate,
+                boneHip.InitialWorldMatrix.Rotate
+                ).Transpose();
+
+
             var heights = new List<float>();
 
-            foreach (var bone in _groundingIKBones)
+            foreach (var t in _groundingIKBones)
             {
-                var src = QumarionModel.Bones[QumaBone2MMDBone.GetQumaBone(bone)];
-                var dest = MMDStandardBones.GetBone(model, bone);
-                if (src == null || dest == null) continue;
 
-                var initpos = src.InitialWorldMatrix.Translate;
-                var currentpos = src.WorldMatrix.Translate;
-                heights.Add(currentpos.Y - initpos.Y);
+                var src = QumarionModel.Bones[QumaBone2MMDBone.GetQumaBone(t)];
+                var dest = MMDStandardBones.GetBone(model, t);
+                if (dest == null) continue;
+
+                //1: Tポーズでの Hip -> t のベクトル取得(これは直立)
+                var initPosWorld = src.InitialWorldMatrix.Translate;
+                var initPos = new Vector3f(
+                    initPosWorld.X - initPosHip.X,
+                    initPosWorld.Y - initPosHip.Y,
+                    initPosWorld.Z - initPosHip.Z
+                    );
+                //2: 現在の Hip -> t のベクトルを回転除去しつつ取得
+
+                var posWorld = src.WorldMatrix.Translate;
+                var pos = new Vector3f(
+                    posWorld.X - posHip.X,
+                    posWorld.Y - posHip.Y,
+                    posWorld.Z - posHip.Z
+                    );
+                //ここ大事: posのベクトルは体の回転込みの値なので逆回転して相殺
+                pos = MatrixUtil.Multiply(rotHipInverse, pos);
+
+                //NOTE: MMMではZ軸が後ろ向き正だがQumarionだと前向き正
+                var dif = new Vector3(
+                    pos.X - initPos.X,
+                    pos.Y - initPos.Y,
+                    -pos.Z + initPos.Z
+                    );
+
+                heights.Add(dif.Y * LegIKScaleFactor);
             }
-
             if (heights.Count == 0) return;
 
             //移動差分のうちもっとも低い値を取る
@@ -151,8 +237,6 @@ namespace QumarionForMMM
             motion.Move = new Vector3(motion.Move.X, -lowestPosDif, motion.Move.Z);
 
             centerBone.CurrentLocalMotion = motion;
-
-
 
         }
 
@@ -170,11 +254,8 @@ namespace QumarionForMMM
         //Qumarion -> 正規化済みの人側モデルまでの処理担当
         private readonly QumaBone2MikuMikuMoving _rootBone;
 
-        private float SinArm => (float)(Math.Sin(ArmAngleRad * Math.PI / 180.0f));
-        private float CosArm => (float)(Math.Cos(ArmAngleRad * Math.PI / 180.0f));
-
-
-
+        private float SinArm => (float)Math.Sin(ArmAngleRad);
+        private float CosArm => (float)Math.Cos(ArmAngleRad);
 
         #region 諸関数が対象とするボーンの一覧
 
@@ -218,6 +299,7 @@ namespace QumarionForMMM
         private readonly MMDStandardBone[] _rightArmBones = new[]
         {
             MMDStandardBone.RightUpperArm,
+            MMDStandardBone.RightArmRoll,
             MMDStandardBone.RightElbow,
             MMDStandardBone.RightHand
         };
@@ -225,6 +307,7 @@ namespace QumarionForMMM
         private readonly MMDStandardBone[] _leftArmBones = new[]
         {
             MMDStandardBone.LeftUpperArm,
+            MMDStandardBone.LeftArmRoll,
             MMDStandardBone.LeftElbow,
             MMDStandardBone.LeftHand
         };
@@ -239,6 +322,14 @@ namespace QumarionForMMM
         {
             MMDStandardBone.LeftFootIK,
             MMDStandardBone.RightFootIK
+        };
+
+        //追加: X軸(をArmAngleの分だけ傾けた軸)の回転つまり「ねじり」を無効化して他ボーンに押し付けるペア
+        //例: 「左腕」のねじり回転は「左腕捩」に押しつける。これによって肩の脱臼を防ぐ効果があるハズ
+        private readonly Dictionary<MMDStandardBone, MMDStandardBone> _armRollPair = new Dictionary<MMDStandardBone, MMDStandardBone>()
+        {
+            { MMDStandardBone.LeftUpperArm, MMDStandardBone.LeftArmRoll },
+            { MMDStandardBone.RightUpperArm, MMDStandardBone.RightArmRoll }
         };
 
         #endregion

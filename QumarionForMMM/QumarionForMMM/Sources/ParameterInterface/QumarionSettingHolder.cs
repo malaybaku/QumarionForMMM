@@ -60,9 +60,9 @@ namespace QumarionForMMM
             set { SetAndRaisePropertyChanged(ref _bindFootToGround, value, nameof(BindFootToGround)); }
         }
 
-        private uint _legIKScaleFactor = 10;
+        private float _legIKScaleFactor = 10;
         /// <summary>足IKの計算に用いるスケールファクターです。</summary>
-        public uint LegIKScaleFactor
+        public float LegIKScaleFactor
         {
             get { return _legIKScaleFactor; }
             set { SetAndRaisePropertyChanged(ref _legIKScaleFactor, value, nameof(LegIKScaleFactor)); }

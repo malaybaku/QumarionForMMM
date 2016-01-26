@@ -76,6 +76,8 @@
     <Compile Include="Sources\MathUtil\MatrixToQuartanion.cs" />
     <Compile Include="Sources\BoneMapping\MMDStandardBone.cs" />
     <Compile Include="Sources\Core\ModelHandler.cs" />
+    <Compile Include="Sources\MathUtil\MatrixUtil.cs" />
+    <Compile Include="Sources\MathUtil\QuaternionDecomposition.cs" />
     <Compile Include="Sources\ParameterInterface\ModelHandlerSettingAdapter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Sources\Core\QumaBone2MMM.cs" />

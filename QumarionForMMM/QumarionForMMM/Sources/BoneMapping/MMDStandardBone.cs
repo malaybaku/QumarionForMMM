@@ -1,8 +1,6 @@
-﻿using MikuMikuPlugin;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using MikuMikuPlugin;
 
 namespace QumarionForMMM
 {
@@ -14,8 +12,8 @@ namespace QumarionForMMM
         private static readonly Dictionary<MMDStandardBone, string> _mmdBoneNames = new Dictionary<MMDStandardBone, string>()
         {
             { MMDStandardBone.Center, "センター" },
-            //TODO: これ適切かなあ？
-            { MMDStandardBone.Hip, "全ての親" },
+            //TODO: Hipの対応先が意外とよく分からないので頑張って検証すること
+            { MMDStandardBone.Hip, "センター" },
 
             { MMDStandardBone.Spine, "上半身" },
             { MMDStandardBone.Spine2, "上半身2" },

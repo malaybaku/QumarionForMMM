@@ -19,7 +19,7 @@ namespace QumarionForMMM
         public bool UseAccelerometerFilter { get; private set; } = false;
         public AccelerometerRestrictMode AccelerometerRestrictMode { get; private set; } = AccelerometerRestrictMode.None;
         public bool BindFootToGround { get; private set; } = false;
-        public uint LegIKScaleFactor { get; private set; } = 10;
+        public float LegIKScaleFactor { get; private set; } = 10.0f;
         public float ArmAngle { get; private set; } = 35.0f;
 
         private void checkBoxUseAccelerometer_CheckedChanged(object sender, EventArgs e)
@@ -80,6 +80,7 @@ namespace QumarionForMMM
         }
         private delegate bool BindFootToGroundDelegate();
 
+        //NOTE: コレだとテキスト1文字打つたびに更新処理が走る。まあ問題ないと言えば問題ないが。
         private void textBoxLegIKScaleFactor_TextChanged(object sender, EventArgs e)
         {
             string text = (string)Invoke(new LegIKScaleFactorDelegate(() => textBoxLegIKScaleFactor.Text));
@@ -94,7 +95,7 @@ namespace QumarionForMMM
 
         private void textBoxArmAngle_TextChanged(object sender, EventArgs e)
         {
-            string text = (string)Invoke(new LegIKScaleFactorDelegate(() => textBoxLegIKScaleFactor.Text));
+            string text = (string)Invoke(new ArmAngleDelegate(() => textBoxArmAngle.Text));
             float armAngle;
             if (float.TryParse(text, out armAngle))
             {
